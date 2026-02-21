@@ -1,0 +1,54 @@
+# ── Environment & Secrets ──────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example        # Allow a safe template to be committed
+
+# ── Python ─────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-wheel-metadata/
+
+# ── Virtual Environments ────────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+.virtualenv/
+
+# ── Uploads (user data — never commit) ─────────────────────────────────────────
+backend/uploads/
+uploads/
+
+# ── Docker volumes (local runtime data) ────────────────────────────────────────
+qdrant_storage/
+postgres_data/
+
+# ── Sentence-transformers model cache ──────────────────────────────────────────
+.cache/
+backend/.cache/
+~/.cache/huggingface/
+
+# ── Pytest / Coverage ───────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── IDEs ────────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS ──────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Logs ────────────────────────────────────────────────────────────────────────
+*.log
+logs/
