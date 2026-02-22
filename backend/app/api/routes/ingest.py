@@ -8,8 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.db.postgres import Chunk, Document, get_db
+from app.db.qdrant import get_qdrant
 from app.ingestion.chunker import split_into_chunks
 from app.ingestion.parser import extract_text, is_supported
+from app.processing.embedder import embed_texts
+from qdrant_client.models import PointStruct
 
 router = APIRouter(prefix="/ingest", tags=["Ingestion"])
 
@@ -68,6 +71,46 @@ async def ingest_document(
     if not chunks:
         raise HTTPException(status_code=422, detail="Could not extract meaningful chunks.")
 
+    # ── Generate embeddings ────────────────────────────────────────────────
+    texts = [c.content for c in chunks]
+    vectors = embed_texts(texts)
+
+    # ── Index into Qdrant + save to Postgres ───────────────────────────────
+    qdrant_client = get_qdrant()
+    points: list[PointStruct] = []
+    db_chunks: list[Chunk] = []
+
+    for chunk, vector in zip(chunks, vectors):
+        point_id = str(uuid.uuid4())
+
+        payload = {
+            "content": chunk.content,
+            "document_id": doc.id,
+            "filename": file.filename,
+            "source": source,
+            "category": category,
+            "client": client,
+            "chunk_index": chunk.chunk_index,
+        }
+
+        points.append(PointStruct(id=point_id, vector=vector, payload=payload))
+        db_chunks.append(
+            Chunk(
+                document_id=doc.id,
+                content=chunk.content,
+                chunk_index=chunk.chunk_index,
+                qdrant_id=point_id,
+            )
+        )
+
+    # Batch upsert to Qdrant
+    await qdrant_client.upsert(
+        collection_name=settings.qdrant_collection,
+        points=points,
+    )
+
+    # Persist chunks to Postgres
+    db.add_all(db_chunks)
     await db.commit()
 
     return {
@@ -104,7 +147,21 @@ async def delete_document(document_id: int, db: AsyncSession = Depends(get_db)):
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
 
+    # Collect qdrant IDs to delete
+    chunk_result = await db.execute(
+        select(Chunk).where(Chunk.document_id == document_id)
+    )
+    chunks = chunk_result.scalars().all()
+    qdrant_ids = [c.qdrant_id for c in chunks]
+
+    if qdrant_ids:
+        qdrant_client = get_qdrant()
+        await qdrant_client.delete(
+            collection_name=settings.qdrant_collection,
+            points_selector=qdrant_ids,
+        )
+
     await db.delete(doc)
     await db.commit()
 
-    return {"message": f"Document {document_id} deleted."}
+    return {"message": f"Document {document_id} deleted.", "chunks_removed": len(qdrant_ids)}
