@@ -8,6 +8,11 @@ asyncpg==0.29.0
 alembic==1.13.1
 psycopg2-binary==2.9.9
 
+# Document Parsing
+pymupdf==1.24.5          # PDF
+python-docx==1.1.2       # DOCX
+python-magic==0.4.27     # File type detection
+
 # Utilities
 pydantic==2.7.1
 pydantic-settings==2.3.1

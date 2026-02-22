@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy import select, text
 
+from app.api.routes import ingest
 from app.db.postgres import Chunk, init_db, engine
 
 async def wait_for_postgres(retries: int = 10, delay: float = 3.0):
@@ -46,6 +47,8 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+app.include_router(ingest.router)
 
 @app.get("/", tags=["Health"])
 async def root():

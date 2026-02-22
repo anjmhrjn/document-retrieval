@@ -6,9 +6,13 @@ class Settings(BaseSettings):
     # PostgreSQL
     postgres_host: str = "localhost"
     postgres_port: int = 5432
-    postgres_db: str = "docmind"
-    postgres_user: str = "docmind_user"
-    postgres_password: str = "docmind_secret"
+    postgres_db: str = "docretrieval"
+    postgres_user: str = "doc_retrieval_user"
+    postgres_password: str = "doc_retrielva_user_pass"
+
+    # Chunking
+    chunk_size: int = 512
+    chunk_overlap: int = 64
 
     # App
     upload_dir: str = "/app/uploads"
