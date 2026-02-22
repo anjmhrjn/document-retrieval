@@ -4,9 +4,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy import select, text
 
-from app.api.routes import ingest
-from app.db.postgres import init_db
+from app.api.routes import ingest, search
+from app.db.postgres import init_db, Chunk
 from app.db.qdrant import init_qdrant
+from app.search.bm25_index import bm25_index
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,10 +21,28 @@ async def lifespan(app: FastAPI):
     print("[Startup] Initializing Qdrant...")
     await init_qdrant()
 
+    print("[Startup] Rebuilding BM25 index from database...")
+    await _rebuild_bm25()
+
     print("[Startup] Ready.")
     yield
 
     print("[Shutdown] Cleaning up...")
+
+async def _rebuild_bm25():
+    """Load all chunks from Postgres and rebuild the BM25 index."""
+    from app.db.postgres import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Chunk))
+        chunks = result.scalars().all()
+
+    entries = [(c.qdrant_id, c.content) for c in chunks]
+    if entries:
+        bm25_index.rebuild_from(entries)
+        print(f"[BM25] Indexed {len(entries)} chunks.")
+    else:
+        print("[BM25] No existing chunks found — starting fresh.")
 
 app = FastAPI(
     title="Document Retrieval - Intelligent Document Ingestion & Search",
@@ -36,6 +55,7 @@ app = FastAPI(
 )
 
 app.include_router(ingest.router)
+app.include_router(search.router)
 
 @app.get("/", tags=["Health"])
 async def root():

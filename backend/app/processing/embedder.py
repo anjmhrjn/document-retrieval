@@ -28,3 +28,7 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
         normalize_embeddings=True,  # Cosine sim = dot product on normalized vecs
     )
     return embeddings.tolist()
+
+def embed_query(query: str) -> list[float]:
+    """Generate embedding for a single query string."""
+    return embed_texts([query])[0]

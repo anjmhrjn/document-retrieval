@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     chunk_size: int = 512
     chunk_overlap: int = 64
 
+    # Search
+    hybrid_alpha: float = 0.7  # semantic weight; BM25 weight = 1 - alpha
+    top_k: int = 10
+
     # App
     upload_dir: str = "/app/uploads"
 
