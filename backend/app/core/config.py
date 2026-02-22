@@ -10,6 +10,15 @@ class Settings(BaseSettings):
     postgres_user: str = "doc_retrieval_user"
     postgres_password: str = "doc_retrielva_user_pass"
 
+    # Qdrant
+    qdrant_host: str = "localhost"
+    qdrant_port: int = 6333
+    qdrant_collection: str = "documents"
+
+    # Embedding
+    embedding_model: str = "all-MiniLM-L6-v2"
+    embedding_dim: int = 384
+
     # Chunking
     chunk_size: int = 512
     chunk_overlap: int = 64

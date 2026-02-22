@@ -8,6 +8,14 @@ asyncpg==0.29.0
 alembic==1.13.1
 psycopg2-binary==2.9.9
 
+# Vector DB
+qdrant-client==1.9.1
+
+# Embeddings
+sentence-transformers==3.0.1
+torch==2.3.0
+numpy==1.26.4
+
 # Document Parsing
 pymupdf==1.24.5          # PDF
 python-docx==1.1.2       # DOCX
