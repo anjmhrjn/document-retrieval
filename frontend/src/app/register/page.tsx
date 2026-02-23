@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { register } from "@/lib/api";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -15,6 +16,15 @@ export default function RegisterPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setLoading(true);
+    try {
+      await register(name, email, password);
+      router.push("/login");
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -22,7 +32,7 @@ export default function RegisterPage() {
       <div className="card w-full max-w-sm p-8">
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-semibold text-gray-900">
-            Doc<span className="text-blue-600">Retrieval</span>
+            Doc<span className="text-blue-600">Mind</span>
           </h1>
           <p className="text-sm text-gray-500 mt-1">Create your account</p>
         </div>

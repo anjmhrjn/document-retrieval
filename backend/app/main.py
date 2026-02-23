@@ -2,9 +2,10 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, text
 
-from app.api.routes import ingest, search
+from app.api.routes import ingest, search, auth
 from app.db.postgres import init_db, Chunk
 from app.db.qdrant import init_qdrant
 from app.search.bm25_index import bm25_index
@@ -54,6 +55,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth.router)
 app.include_router(ingest.router)
 app.include_router(search.router)
 
@@ -62,6 +72,7 @@ async def root():
     return {
         "service": "Document Retrieval API",
         "status": "running",
+        "bm25_index_size": bm25_index.size,
     }
 
 @app.get("/health", tags=["Health"])

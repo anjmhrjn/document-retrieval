@@ -7,14 +7,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.security import get_current_user
 from app.db.postgres import Chunk, Document, get_db
 from app.db.qdrant import get_qdrant
 from app.ingestion.chunker import split_into_chunks
 from app.ingestion.parser import extract_text, is_supported
 from app.processing.embedder import embed_texts
+from app.search.bm25_index import bm25_index
 from qdrant_client.models import PointStruct
 
-router = APIRouter(prefix="/ingest", tags=["Ingestion"])
+router = APIRouter(prefix="/ingest", tags=["Ingestion"], dependencies=[Depends(get_current_user)])
 
 
 @router.post("/", summary="Upload and ingest a document")
@@ -103,11 +105,17 @@ async def ingest_document(
             )
         )
 
+        # Update BM25 index in-memory
+        bm25_index.add(point_id, chunk.content)
+
     # Batch upsert to Qdrant
     await qdrant_client.upsert(
         collection_name=settings.qdrant_collection,
         points=points,
     )
+
+    # Rebuild BM25 after batch add
+    bm25_index.build()
 
     # Persist chunks to Postgres
     db.add_all(db_chunks)
@@ -163,5 +171,14 @@ async def delete_document(document_id: int, db: AsyncSession = Depends(get_db)):
 
     await db.delete(doc)
     await db.commit()
+
+    # Rebuild BM25 without deleted chunks
+    remaining_ids = set(bm25_index.corpus_ids) - set(qdrant_ids)
+    entries = [
+        (qid, text)
+        for qid, text in zip(bm25_index.corpus_ids, bm25_index.corpus_texts)
+        if qid in remaining_ids
+    ]
+    bm25_index.rebuild_from(entries)
 
     return {"message": f"Document {document_id} deleted.", "chunks_removed": len(qdrant_ids)}

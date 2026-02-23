@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { login } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,6 +15,15 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setLoading(true);
+    try {
+      await login(email, password);
+      router.push("/search");
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -22,7 +32,7 @@ export default function LoginPage() {
         {/* Header */}
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-semibold text-gray-900">
-            Doc<span className="text-blue-600">Retrieval</span>
+            Doc<span className="text-blue-600">Mind</span>
           </h1>
           <p className="text-sm text-gray-500 mt-1">Sign in to your account</p>
         </div>

@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
+from app.core.security import get_current_user
 from app.search.hybrid import hybrid_search
 
-router = APIRouter(prefix="/search", tags=["Search"])
+router = APIRouter(prefix="/search", tags=["Search"], dependencies=[Depends(get_current_user)])
 
 
 class SearchRequest(BaseModel):
