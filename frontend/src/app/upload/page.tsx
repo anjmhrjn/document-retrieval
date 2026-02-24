@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import AuthGuard from "@/components/AuthGuard";
 import { uploadDocument } from "@/lib/api";
 
 export default function UploadPage() {
@@ -44,7 +45,7 @@ export default function UploadPage() {
   }
 
   return (
-    <div>
+    <AuthGuard>
       <div className="max-w-lg">
         <div className="mb-8">
           <h1 className="text-2xl font-semibold text-gray-900">Upload</h1>
@@ -146,6 +147,6 @@ export default function UploadPage() {
           </button>
         </form>
       </div>
-    </div>
+    </AuthGuard>
   );
 }

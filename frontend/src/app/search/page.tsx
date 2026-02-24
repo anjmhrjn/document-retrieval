@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import AuthGuard from "@/components/AuthGuard";
 import { search, SearchResult } from "@/lib/api";
 
 export default function SearchPage() {
@@ -38,7 +39,7 @@ export default function SearchPage() {
   }
 
   return (
-    <div>
+    <AuthGuard>
       <div className="max-w-2xl">
         {/* Page header */}
         <div className="mb-8">
@@ -142,6 +143,6 @@ export default function SearchPage() {
           ))}
         </div>
       </div>
-    </div>
+    </AuthGuard>
   );
 }

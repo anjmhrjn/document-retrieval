@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AuthGuard from "@/components/AuthGuard";
 import { getDocuments, deleteDocument, Document } from "@/lib/api";
 
 const FILE_ICONS: Record<string, string> = {
@@ -51,7 +52,7 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div>
+    <AuthGuard>
       <div className="max-w-3xl">
         <div className="mb-8 flex items-center justify-between">
           <div>
@@ -130,6 +131,6 @@ export default function DocumentsPage() {
           </div>
         )}
       </div>
-    </div>
+    </AuthGuard>
   );
 }
