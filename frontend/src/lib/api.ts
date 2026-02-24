@@ -72,3 +72,30 @@ export function logout() {
   localStorage.removeItem("token");
   window.location.href = "/login";
 }
+
+// ── Documents ─────────────────────────────────────────────────────────────────
+
+export async function getDocuments() {
+  return request<Document[]>("/ingest/documents");
+}
+
+export async function uploadDocument(formData: FormData) {
+  return request("/ingest/", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function deleteDocument(id: number) {
+  return request(`/ingest/documents/${id}`, { method: "DELETE" });
+}
+
+export interface Document {
+  id: number;
+  filename: string;
+  file_type: string;
+  source: string | null;
+  category: string | null;
+  client: string | null;
+  upload_time: string;
+}

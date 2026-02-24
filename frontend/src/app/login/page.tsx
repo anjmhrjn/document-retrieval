@@ -32,7 +32,7 @@ export default function LoginPage() {
         {/* Header */}
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-semibold text-gray-900">
-            Doc<span className="text-blue-600">Mind</span>
+            Doc<span className="text-blue-600">Retrieval</span>
           </h1>
           <p className="text-sm text-gray-500 mt-1">Sign in to your account</p>
         </div>

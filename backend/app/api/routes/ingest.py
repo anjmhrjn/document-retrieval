@@ -179,6 +179,7 @@ async def delete_document(document_id: int, db: AsyncSession = Depends(get_db)):
         for qid, text in zip(bm25_index.corpus_ids, bm25_index.corpus_texts)
         if qid in remaining_ids
     ]
-    bm25_index.rebuild_from(entries)
+    if entries:
+        bm25_index.rebuild_from(entries)
 
     return {"message": f"Document {document_id} deleted.", "chunks_removed": len(qdrant_ids)}
