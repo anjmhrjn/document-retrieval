@@ -26,11 +26,14 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    documents = relationship("Document", back_populates="owner", cascade="all, delete")
+
 
 class Document(Base):
     __tablename__ = "documents"
 
     id = Column(Integer, primary_key=True, index=True)
+    uploaded_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     filename = Column(String, nullable=False)
     file_type = Column(String, nullable=False)
     source = Column(String, nullable=True)
@@ -39,7 +42,8 @@ class Document(Base):
     upload_time = Column(DateTime, default=datetime.utcnow)
     extra_metadata = Column(JSON, nullable=True)
 
-    chunks = relationship("Chunk", back_populates="document", cascade="all, delete")
+    owner = relationship("User", back_populates="documents")
+    chunks = relationship("Chunk", back_populates="document", cascade="all, delete-orphan")
 
 
 class Chunk(Base):

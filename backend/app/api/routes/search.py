@@ -35,21 +35,26 @@ class SearchResponse(BaseModel):
     results: list[SearchResultItem]
 
 
-@router.post("/", response_model=SearchResponse, summary="Hybrid semantic + keyword search")
-async def search(request: SearchRequest):
+@router.post("/", response_model=SearchResponse)
+async def search(
+    request: SearchRequest,
+    current_user: dict = Depends(get_current_user),
+):
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty.")
+
+    user_id = int(current_user["sub"])
 
     filters = {
         "source": request.source,
         "category": request.category,
         "client": request.client,
     }
-    # Remove None values
     filters = {k: v for k, v in filters.items() if v is not None}
 
     results = await hybrid_search(
         query=request.query,
+        user_id=user_id,
         top_k=request.top_k,
         filters=filters or None,
     )
@@ -74,20 +79,16 @@ async def search(request: SearchRequest):
     )
 
 
-@router.get("/", summary="Quick search via GET query param")
+@router.get("/", response_model=SearchResponse)
 async def search_get(
-    q: str = Query(..., description="Search query"),
+    q: str = Query(...),
     top_k: int = Query(default=10, ge=1, le=50),
     source: str | None = Query(None),
     category: str | None = Query(None),
     client: str | None = Query(None),
+    current_user: dict = Depends(get_current_user),
 ):
     return await search(
-        SearchRequest(
-            query=q,
-            top_k=top_k,
-            source=source,
-            category=category,
-            client=client,
-        )
+        SearchRequest(query=q, top_k=top_k, source=source, category=category, client=client),
+        current_user=current_user,
     )

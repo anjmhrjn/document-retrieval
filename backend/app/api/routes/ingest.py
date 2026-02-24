@@ -26,18 +26,17 @@ async def ingest_document(
     category: str = Form(None, description="User-defined tag"),
     client: str = Form(None, description="Client name (for legal use case)"),
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ):
-    # ── Validate file type ─────────────────────────────────────────────────
     if not is_supported(file.filename):
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported file type. Allowed: .pdf, .docx, .txt, .md",
         )
 
-    # ── Save uploaded file ─────────────────────────────────────────────────
+    # Save uploaded file
     upload_dir = Path(settings.upload_dir)
     upload_dir.mkdir(parents=True, exist_ok=True)
-
     safe_name = f"{uuid.uuid4()}_{file.filename}"
     file_path = upload_dir / safe_name
 
@@ -45,7 +44,7 @@ async def ingest_document(
     with open(file_path, "wb") as f:
         f.write(content)
 
-    # ── Extract text ───────────────────────────────────────────────────────
+    # Extract text
     try:
         raw_text = extract_text(str(file_path))
     except Exception as e:
@@ -56,9 +55,11 @@ async def ingest_document(
         os.remove(file_path)
         raise HTTPException(status_code=422, detail="Document appears to be empty or unreadable.")
 
-    # ── Save document record ───────────────────────────────────────────────
+    # Save document record — scoped to current user
+    user_id = int(current_user["sub"])
     file_ext = Path(file.filename).suffix.lower().lstrip(".")
     doc = Document(
+        uploaded_by=user_id,
         filename=file.filename,
         file_type=file_ext,
         source=source,
@@ -66,35 +67,33 @@ async def ingest_document(
         client=client,
     )
     db.add(doc)
-    await db.flush()  # Get the document ID before committing
+    await db.flush()
 
-    # ── Chunk text ─────────────────────────────────────────────────────────
+    # Chunk and embed
     chunks = split_into_chunks(raw_text)
     if not chunks:
         raise HTTPException(status_code=422, detail="Could not extract meaningful chunks.")
 
-    # ── Generate embeddings ────────────────────────────────────────────────
     texts = [c.content for c in chunks]
     vectors = embed_texts(texts)
 
-    # ── Index into Qdrant + save to Postgres ───────────────────────────────
+    # Index into Qdrant + Postgres
     qdrant_client = get_qdrant()
     points: list[PointStruct] = []
     db_chunks: list[Chunk] = []
 
     for chunk, vector in zip(chunks, vectors):
         point_id = str(uuid.uuid4())
-
         payload = {
             "content": chunk.content,
             "document_id": doc.id,
+            "uploaded_by": user_id,
             "filename": file.filename,
             "source": source,
             "category": category,
             "client": client,
             "chunk_index": chunk.chunk_index,
         }
-
         points.append(PointStruct(id=point_id, vector=vector, payload=payload))
         db_chunks.append(
             Chunk(
@@ -104,20 +103,14 @@ async def ingest_document(
                 qdrant_id=point_id,
             )
         )
-
-        # Update BM25 index in-memory
         bm25_index.add(point_id, chunk.content)
 
-    # Batch upsert to Qdrant
     await qdrant_client.upsert(
         collection_name=settings.qdrant_collection,
         points=points,
     )
-
-    # Rebuild BM25 after batch add
     bm25_index.build()
 
-    # Persist chunks to Postgres
     db.add_all(db_chunks)
     await db.commit()
 
@@ -129,9 +122,17 @@ async def ingest_document(
     }
 
 
-@router.get("/documents", summary="List all ingested documents")
-async def list_documents(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Document).order_by(Document.upload_time.desc()))
+@router.get("/documents", summary="List documents belonging to the current user")
+async def list_documents(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = int(current_user["sub"])
+    result = await db.execute(
+        select(Document)
+        .where(Document.uploaded_by == user_id)
+        .order_by(Document.upload_time.desc())
+    )
     docs = result.scalars().all()
     return [
         {
@@ -148,14 +149,26 @@ async def list_documents(db: AsyncSession = Depends(get_db)):
 
 
 @router.delete("/documents/{document_id}", summary="Delete a document and its chunks")
-async def delete_document(document_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Document).where(Document.id == document_id))
+async def delete_document(
+    document_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = int(current_user["sub"])
+
+    # Only allow deletion of own documents
+    result = await db.execute(
+        select(Document).where(
+            Document.id == document_id,
+            Document.uploaded_by == user_id,
+        )
+    )
     doc = result.scalar_one_or_none()
 
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
 
-    # Collect qdrant IDs to delete
+    # Fetch all chunk qdrant IDs before deleting
     chunk_result = await db.execute(
         select(Chunk).where(Chunk.document_id == document_id)
     )
@@ -172,14 +185,16 @@ async def delete_document(document_id: int, db: AsyncSession = Depends(get_db)):
     await db.delete(doc)
     await db.commit()
 
-    # Rebuild BM25 without deleted chunks
-    remaining_ids = set(bm25_index.corpus_ids) - set(qdrant_ids)
+    deleted_ids = set(qdrant_ids)
     entries = [
         (qid, text)
         for qid, text in zip(bm25_index.corpus_ids, bm25_index.corpus_texts)
-        if qid in remaining_ids
+        if qid not in deleted_ids
     ]
-    if entries:
-        bm25_index.rebuild_from(entries)
 
-    return {"message": f"Document {document_id} deleted.", "chunks_removed": len(qdrant_ids)}
+    bm25_index.rebuild_from(entries)
+
+    return {
+        "message": f"Document {document_id} and all its chunks have been deleted.",
+        "chunks_removed": len(qdrant_ids),
+    }

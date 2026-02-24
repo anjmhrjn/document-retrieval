@@ -23,6 +23,9 @@ class BM25Index:
         self._bm25 = None  # Invalidate
 
     def build(self):
+        if not self.corpus_texts:
+            self._bm25 = None
+            return
         tokenized = [_tokenize(t) for t in self.corpus_texts]
         self._bm25 = BM25Okapi(tokenized)
 
@@ -48,7 +51,9 @@ class BM25Index:
         """Rebuild index from list of (qdrant_id, text) tuples."""
         self.corpus_ids = [e[0] for e in entries]
         self.corpus_texts = [e[1] for e in entries]
-        self.build()
+        self._bm25 = None  # Always reset first
+        if self.corpus_texts:  # Only build if there's something to index
+            self.build()
 
     @property
     def size(self) -> int:
