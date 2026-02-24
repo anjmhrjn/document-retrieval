@@ -90,6 +90,37 @@ export async function deleteDocument(id: number) {
   return request(`/ingest/documents/${id}`, { method: "DELETE" });
 }
 
+// ── Search ────────────────────────────────────────────────────────────────────
+
+export interface SearchResult {
+  qdrant_id: string;
+  score: number;
+  content: string;
+  document_id: number;
+  filename: string;
+  source: string | null;
+  category: string | null;
+  client: string | null;
+  chunk_index: number;
+}
+
+export interface SearchResponse {
+  query: string;
+  total_results: number;
+  results: SearchResult[];
+}
+
+export async function search(
+  query: string,
+  top_k = 10,
+  filters: { source?: string; category?: string; client?: string } = {}
+): Promise<SearchResponse> {
+  return request("/search/", {
+    method: "POST",
+    body: JSON.stringify({ query, top_k, ...filters }),
+  });
+}
+
 export interface Document {
   id: number;
   filename: string;
